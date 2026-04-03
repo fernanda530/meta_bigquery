@@ -38,7 +38,7 @@ jobs:
           META_FIELDS: reach,campaign_id,campaign_name,ad_id,ad_name,actions,cost_per_action_type,cpc,date_start,date_stop,spend,adset_name,objective
           META_BREAKDOWNS: age,gender
           META_LEVEL: ad
-          META_DATE_PRESET: yesterday
+          META_DATE_PRESET: last_7d
           MODO_PRUEBA: "False"
           EXPORTAR_EXCEL_PREVIEW: "False"
         run: |
