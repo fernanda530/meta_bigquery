@@ -3,7 +3,7 @@ name: Meta a BigQuery diario
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 02 * * *'
+    - cron: '0 08 * * *'
 
 jobs:
   run-pipeline:
