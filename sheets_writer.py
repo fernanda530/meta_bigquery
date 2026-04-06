@@ -55,6 +55,11 @@ def _obtener_ids_existentes(worksheet, id_column_name: str) -> Set[str]:
     return ids
 
 
+def _es_hoja_vacia(worksheet) -> bool:
+    valores = worksheet.get_all_values()
+    return len(valores) == 0
+
+
 def _append_dataframe_si_nuevo(df: pd.DataFrame, nombre_hoja: str, id_column_name: str):
     if df.empty:
         print(f"No hay datos para enviar a la hoja '{nombre_hoja}'.")
@@ -73,7 +78,12 @@ def _append_dataframe_si_nuevo(df: pd.DataFrame, nombre_hoja: str, id_column_nam
     df_export = _preparar_dataframe_para_sheets(df)
     df_export[id_column_name] = df_export[id_column_name].astype(str)
 
-    ids_existentes = _obtener_ids_existentes(worksheet, id_column_name)
+    if _es_hoja_vacia(worksheet):
+        worksheet.update(range_name="A1", values=[df_export.columns.tolist()])
+        ids_existentes = set()
+    else:
+        ids_existentes = _obtener_ids_existentes(worksheet, id_column_name)
+
     df_nuevo = df_export[~df_export[id_column_name].isin(ids_existentes)].copy()
 
     if df_nuevo.empty:
@@ -81,13 +91,7 @@ def _append_dataframe_si_nuevo(df: pd.DataFrame, nombre_hoja: str, id_column_nam
         return
 
     valores_nuevos: List[List] = df_nuevo.values.tolist()
-    valores_actuales = worksheet.get_all_values()
-
-    if not valores_actuales:
-        worksheet.update("A1", [df_export.columns.tolist()])
-        worksheet.append_rows(valores_nuevos, value_input_option="USER_ENTERED")
-    else:
-        worksheet.append_rows(valores_nuevos, value_input_option="USER_ENTERED")
+    worksheet.append_rows(valores_nuevos, value_input_option="USER_ENTERED")
 
     print(f"Se agregaron {len(df_nuevo)} filas nuevas en la hoja '{nombre_hoja}'.")
 
