@@ -18,8 +18,8 @@ def generar_bloques_fecha(fecha_inicio_str, fecha_fin_str, dias_por_bloque=7):
 
 
 def main():
-    FECHA_INICIO = "2026-01-01"
-    FECHA_FIN = "2026-03-31"
+    FECHA_INICIO = "2026-04-01"
+    FECHA_FIN = "2026-04-05"
     DIAS_POR_BLOQUE = 7
 
     print("===== INICIO HISTÓRICO META =====")
