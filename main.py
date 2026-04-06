@@ -1,7 +1,7 @@
 from extractor_meta import obtener_insights
 from transformaciones_base import transformar_base
 from transformaciones_resultados import transformar_resultados
-from config import MODO_PRUEBA, EXPORTAR_EXCEL_PREVIEW
+from config import MODO_PRUEBA, EXPORTAR_EXCEL_PREVIEW, ACTUALIZAR_GOOGLE_SHEETS
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
     registros = obtener_insights()
     print(f"Registros extraídos desde Meta: {len(registros)}")
 
-    # Tabla base
+    # TABLA BASE
     df_base = transformar_base(registros)
     print(f"\nFilas tabla base: {len(df_base)}")
     print("Columnas tabla base:")
@@ -20,18 +20,19 @@ def main():
         print("\nVista previa tabla base:")
         print(df_base.head())
 
-    #Tabla resultados
+    # TABLA RESULTADOS
+
     df_resultados = transformar_resultados(registros)
     print(f"\nFilas tabla resultados: {len(df_resultados)}")
     print("Columnas tabla resultados:")
     print(df_resultados.columns.tolist())
- 
+
     if not df_resultados.empty:
         print("\nVista previa tabla resultados:")
         print(df_resultados.head())
 
+    # EXPORTAR EXCELS
 
-    # Exportar excels
     if EXPORTAR_EXCEL_PREVIEW:
         if not df_base.empty:
             df_base.to_excel("preview_meta_base.xlsx", index=False)
@@ -41,7 +42,16 @@ def main():
             df_resultados.to_excel("preview_meta_resultados.xlsx", index=False)
             print("Se generó preview_meta_resultados.xlsx")
 
-    # Bigquery
+    # GOOGLE SHEETS
+
+    if ACTUALIZAR_GOOGLE_SHEETS:
+        print("\nActualizando copia incremental en Google Sheets...")
+        from sheets_writer import actualizar_google_sheets
+        actualizar_google_sheets(df_base, df_resultados)
+        print("Google Sheets actualizado correctamente.")
+
+    # BIGQUERY
+
     if MODO_PRUEBA:
         print("\nMODO_PRUEBA=True → No se subirán datos a BigQuery.")
     else:
