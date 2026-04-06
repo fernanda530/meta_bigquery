@@ -2,18 +2,10 @@ from datetime import datetime, timedelta
 from extractor_meta import obtener_insights
 from transformaciones_base import transformar_base
 from transformaciones_resultados import transformar_resultados
-from loader_bigquery import (
-    cargar_tabla_base_bigquery,
-    cargar_tabla_resultados_bigquery,
-)
-from config import MODO_PRUEBA
+from config import ACTUALIZAR_GOOGLE_SHEETS
 
 
 def generar_bloques_fecha(fecha_inicio_str, fecha_fin_str, dias_por_bloque=7):
-    """
-    Genera bloques de fechas entre fecha_inicio y fecha_fin.
-    Formato esperado: YYYY-MM-DD
-    """
     fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
     fecha_fin = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
 
@@ -26,16 +18,15 @@ def generar_bloques_fecha(fecha_inicio_str, fecha_fin_str, dias_por_bloque=7):
 
 
 def main():
-    #Rango historico
-
-    FECHA_INICIO = "2026-04-01"
-    FECHA_FIN = "2026-04-02"
-    DIAS_POR_BLOQUE = 1
+    FECHA_INICIO = "2026-01-01"
+    FECHA_FIN = "2026-03-31"
+    DIAS_POR_BLOQUE = 7
 
     print("===== INICIO HISTÓRICO META =====")
     print(f"Rango total: {FECHA_INICIO} a {FECHA_FIN}")
     print(f"Tamaño de bloque: {DIAS_POR_BLOQUE} días")
-    print(f"MODO_PRUEBA: {MODO_PRUEBA}")
+    print("BigQuery DESACTIVADO para este histórico.")
+    print(f"ACTUALIZAR_GOOGLE_SHEETS: {ACTUALIZAR_GOOGLE_SHEETS}")
 
     bloques = list(generar_bloques_fecha(FECHA_INICIO, FECHA_FIN, DIAS_POR_BLOQUE))
     print(f"Total de bloques a procesar: {len(bloques)}")
@@ -55,9 +46,6 @@ def main():
         print("=" * 60)
 
         try:
-            
-            # EXTRACCIÓN
-
             registros = obtener_insights(fecha_inicio=since, fecha_fin=until)
             cantidad_registros = len(registros)
             total_registros_crudos += cantidad_registros
@@ -71,9 +59,6 @@ def main():
 
             bloques_con_datos += 1
 
-
-            # TRANSFORMACIÓN
-
             df_base = transformar_base(registros)
             df_resultados = transformar_resultados(registros)
 
@@ -86,27 +71,19 @@ def main():
             print(f"Filas tabla base: {filas_base}")
             print(f"Filas tabla resultados: {filas_resultados}")
 
-            if not df_base.empty:
-                print("\nVista previa base:")
-                print(df_base.head(2))
+            if not df_resultados.empty and "tipo_resultado_tecnico" in df_resultados.columns:
+                tipos_bloque = df_resultados["tipo_resultado_tecnico"].dropna().unique().tolist()
+                tipos_detectados.update(tipos_bloque)
 
-            if not df_resultados.empty:
-                print("\nVista previa resultados:")
-                print(df_resultados.head(2))
-
-
-            # CARGA A BIGQUERY
-
-            if MODO_PRUEBA:
-                print("MODO_PRUEBA=True → No se suben datos a BigQuery en este bloque.")
+            if ACTUALIZAR_GOOGLE_SHEETS:
+                print("Actualizando Google Sheets para este bloque...")
+                from sheets_writer import actualizar_google_sheets
+                actualizar_google_sheets(df_base, df_resultados)
+                print("Google Sheets actualizado correctamente.")
             else:
-                if not df_base.empty:
-                    cargar_tabla_base_bigquery(df_base)
+                print("ACTUALIZAR_GOOGLE_SHEETS=False → No se actualiza Google Sheets.")
 
-                if not df_resultados.empty:
-                    cargar_tabla_resultados_bigquery(df_resultados)
-
-                print(f"Bloque {since} a {until} cargado correctamente.")
+            print("BigQuery omitido en histórico.")
 
         except Exception as e:
             import traceback
@@ -116,8 +93,15 @@ def main():
             traceback.print_exc()
             print("Se continúa con el siguiente bloque...")
 
+    print("\n" + "-" * 60)
+    print("TIPOS DE RESULTADO DETECTADOS EN TODO EL HISTÓRICO")
+    print("-" * 60)
 
-    # RESUMEN FINAL
+    if tipos_detectados:
+        for t in sorted(tipos_detectados):
+            print("-", t)
+    else:
+        print("No se detectaron tipos de resultado.")
 
     print("\n" + "#" * 70)
     print("RESUMEN FINAL HISTÓRICO")
