@@ -35,7 +35,7 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           BQ_DATASET: ${{ secrets.BQ_DATASET }}
           META_API_VERSION: v25.0
-          META_FIELDS: reach,campaign_id,campaign_name,ad_id,ad_name,actions,cost_per_action_type,cpc,date_start,date_stop,spend,adset_name,objective
+          META_FIELDS: reach,campaign_id,campaign_name,status,effective_status,ad_id,ad_name,actions,cost_per_action_type,cpc,date_start,date_stop,spend,adset_name,objective
           META_BREAKDOWNS: age,gender
           META_LEVEL: ad
           META_DATE_PRESET: yesterday
