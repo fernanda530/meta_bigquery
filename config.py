@@ -9,7 +9,7 @@ META_AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
 META_API_VERSION = os.getenv("META_API_VERSION", "v25.0")
 META_FIELDS = os.getenv(
     "META_FIELDS",
-    "date_start,date_stop,campaign_id,campaign_name,objective,ad_id,ad_name,spend,actions,cost_per_action_type"
+    "date_start,date_stop,campaign_id,campaign_name,status,effective_status,objective,ad_id,ad_name,spend,actions,cost_per_action_type"
 )
 
 META_BREAKDOWNS = os.getenv("META_BREAKDOWNS", "age,gender")
