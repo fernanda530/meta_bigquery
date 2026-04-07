@@ -1,7 +1,12 @@
 from datetime import datetime, timedelta
+
 from extractor_meta import obtener_insights
 from transformaciones_base import transformar_base
 from transformaciones_resultados import transformar_resultados
+from loader_bigquery import (
+    cargar_tabla_base_bigquery,
+    cargar_tabla_resultados_bigquery
+)
 from config import ACTUALIZAR_GOOGLE_SHEETS
 
 
@@ -18,6 +23,7 @@ def generar_bloques_fecha(fecha_inicio_str, fecha_fin_str, dias_por_bloque=7):
 
 
 def main():
+    # 🔥 AJUSTA AQUÍ TU HISTÓRICO
     FECHA_INICIO = "2026-01-01"
     FECHA_FIN = "2026-04-05"
     DIAS_POR_BLOQUE = 7
@@ -25,7 +31,6 @@ def main():
     print("===== INICIO HISTÓRICO META =====")
     print(f"Rango total: {FECHA_INICIO} a {FECHA_FIN}")
     print(f"Tamaño de bloque: {DIAS_POR_BLOQUE} días")
-    print("BigQuery DESACTIVADO para este histórico.")
     print(f"ACTUALIZAR_GOOGLE_SHEETS: {ACTUALIZAR_GOOGLE_SHEETS}")
 
     bloques = list(generar_bloques_fecha(FECHA_INICIO, FECHA_FIN, DIAS_POR_BLOQUE))
@@ -71,19 +76,33 @@ def main():
             print(f"Filas tabla base: {filas_base}")
             print(f"Filas tabla resultados: {filas_resultados}")
 
+            # Detectar tipos de resultado
             if not df_resultados.empty and "tipo_resultado_tecnico" in df_resultados.columns:
                 tipos_bloque = df_resultados["tipo_resultado_tecnico"].dropna().unique().tolist()
                 tipos_detectados.update(tipos_bloque)
 
+            # 🔥 CLAVE: TRUNCATE SOLO EN EL PRIMER BLOQUE
+            if i == 1:
+                write_mode = "truncate"
+            else:
+                write_mode = "append"
+
+            print(f"Modo de carga BigQuery: {write_mode}")
+
+            # 🚀 CARGA A BIGQUERY
+            cargar_tabla_base_bigquery(df_base, write_mode=write_mode)
+            cargar_tabla_resultados_bigquery(df_resultados, write_mode=write_mode)
+
+            print("BigQuery actualizado correctamente.")
+
+            # 📊 GOOGLE SHEETS
             if ACTUALIZAR_GOOGLE_SHEETS:
-                print("Actualizando Google Sheets para este bloque...")
+                print("Actualizando Google Sheets...")
                 from sheets_writer import actualizar_google_sheets
                 actualizar_google_sheets(df_base, df_resultados)
                 print("Google Sheets actualizado correctamente.")
             else:
-                print("ACTUALIZAR_GOOGLE_SHEETS=False → No se actualiza Google Sheets.")
-
-            print("BigQuery omitido en histórico.")
+                print("No se actualiza Google Sheets.")
 
         except Exception as e:
             import traceback
@@ -93,15 +112,16 @@ def main():
             traceback.print_exc()
             print("Se continúa con el siguiente bloque...")
 
+    # 📊 RESUMEN
     print("\n" + "-" * 60)
-    print("TIPOS DE RESULTADO DETECTADOS EN TODO EL HISTÓRICO")
+    print("TIPOS DE RESULTADO DETECTADOS")
     print("-" * 60)
 
     if tipos_detectados:
         for t in sorted(tipos_detectados):
             print("-", t)
     else:
-        print("No se detectaron tipos de resultado.")
+        print("No se detectaron tipos.")
 
     print("\n" + "#" * 70)
     print("RESUMEN FINAL HISTÓRICO")
@@ -112,8 +132,8 @@ def main():
     print(f"Bloques sin datos: {bloques_sin_datos}")
     print(f"Bloques con error: {bloques_con_error}")
     print(f"Total registros crudos: {total_registros_crudos}")
-    print(f"Total filas tabla base procesadas: {total_filas_base}")
-    print(f"Total filas tabla resultados procesadas: {total_filas_resultados}")
+    print(f"Total filas base: {total_filas_base}")
+    print(f"Total filas resultados: {total_filas_resultados}")
     print("#" * 70)
     print("===== FIN HISTÓRICO META =====")
 
