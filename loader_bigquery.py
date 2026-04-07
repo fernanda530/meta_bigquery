@@ -63,7 +63,7 @@ def filtrar_nuevos_registros(df, client, table_id, id_column):
 
 #Carga dataframe a bigquery
 #Con append insertamos solo registros nuevos, con truncate remplaza toda la tabla
-def _cargar_dataframe(df, table_name, id_column, write_mode="append"):
+def _cargar_dataframe(df, table_name, id_column, write_mode="truncate"):
 
     if df.empty:
         print(f"No hay datos para cargar en {table_name}.")
