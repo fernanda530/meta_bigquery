@@ -16,7 +16,12 @@ def _obtener_cliente_gspread() -> gspread.Client:
     return client
 
 
-def _asegurar_hoja(spreadsheet: gspread.Spreadsheet, nombre_hoja: str, rows: int = 1000, cols: int = 30):
+def _asegurar_hoja(
+    spreadsheet: gspread.Spreadsheet,
+    nombre_hoja: str,
+    rows: int = 1000,
+    cols: int = 30
+):
     try:
         worksheet = spreadsheet.worksheet(nombre_hoja)
     except gspread.WorksheetNotFound:
@@ -60,6 +65,21 @@ def _es_hoja_vacia(worksheet) -> bool:
     return len(valores) == 0
 
 
+def _encabezados_correctos(worksheet, columnas_esperadas: List[str]) -> bool:
+    valores = worksheet.get_all_values()
+
+    if not valores:
+        return False
+
+    encabezados_actuales = valores[0]
+    return encabezados_actuales == columnas_esperadas
+
+
+def _reinicializar_hoja_con_encabezados(worksheet, columnas: List[str]):
+    worksheet.clear()
+    worksheet.update(range_name="A1", values=[columnas])
+
+
 def _append_dataframe_si_nuevo(df: pd.DataFrame, nombre_hoja: str, id_column_name: str):
     if df.empty:
         print(f"No hay datos para enviar a la hoja '{nombre_hoja}'.")
@@ -78,11 +98,22 @@ def _append_dataframe_si_nuevo(df: pd.DataFrame, nombre_hoja: str, id_column_nam
     df_export = _preparar_dataframe_para_sheets(df)
     df_export[id_column_name] = df_export[id_column_name].astype(str)
 
-    if _es_hoja_vacia(worksheet):
-        worksheet.update(range_name="A1", values=[df_export.columns.tolist()])
+    columnas_esperadas = df_export.columns.tolist()
+    valores_actuales = worksheet.get_all_values()
+
+    if not valores_actuales:
+        print(f"La hoja '{nombre_hoja}' está vacía. Se crearán encabezados.")
+        _reinicializar_hoja_con_encabezados(worksheet, columnas_esperadas)
         ids_existentes = set()
     else:
-        ids_existentes = _obtener_ids_existentes(worksheet, id_column_name)
+        encabezados_actuales = valores_actuales[0]
+
+        if encabezados_actuales != columnas_esperadas:
+            print(f"Encabezados incorrectos o desactualizados en '{nombre_hoja}'. Se reconstruirá la hoja.")
+            _reinicializar_hoja_con_encabezados(worksheet, columnas_esperadas)
+            ids_existentes = set()
+        else:
+            ids_existentes = _obtener_ids_existentes(worksheet, id_column_name)
 
     df_nuevo = df_export[~df_export[id_column_name].isin(ids_existentes)].copy()
 
