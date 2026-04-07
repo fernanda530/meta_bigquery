@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
 
 from extractor_meta import obtener_insights
+from extractor_campaigns import obtener_campaigns
 from transformaciones_base import transformar_base
 from transformaciones_resultados import transformar_resultados
+from transformaciones_campaigns import transformar_campaigns
 from loader_bigquery import (
     cargar_tabla_base_bigquery,
     cargar_tabla_resultados_bigquery
@@ -22,8 +24,43 @@ def generar_bloques_fecha(fecha_inicio_str, fecha_fin_str, dias_por_bloque=7):
         actual = fin_bloque + timedelta(days=1)
 
 
+def enriquecer_con_campaigns(df_principal, df_campaigns):
+    if df_principal.empty:
+        return df_principal
+
+    if df_campaigns.empty:
+        print("No se encontraron campañas para enriquecer datos.")
+        return df_principal
+
+    if "id_campania" not in df_principal.columns:
+        print("El dataframe principal no tiene 'id_campania'.")
+        return df_principal
+
+    if "id_campania" not in df_campaigns.columns:
+        print("El dataframe de campañas no tiene 'id_campania'.")
+        return df_principal
+
+    df = df_principal.copy()
+    df_camp = df_campaigns.copy()
+
+    df["id_campania"] = df["id_campania"].astype(str)
+    df_camp["id_campania"] = df_camp["id_campania"].astype(str)
+
+    df = df.drop(columns=["status", "effective_status", "estado_campania"], errors="ignore")
+
+    columnas_campaign = ["id_campania", "status", "effective_status", "estado_campania"]
+    columnas_campaign_existentes = [c for c in columnas_campaign if c in df_camp.columns]
+
+    df = df.merge(
+        df_camp[columnas_campaign_existentes],
+        on="id_campania",
+        how="left"
+    )
+
+    return df
+
+
 def main():
-    # 🔥 AJUSTA AQUÍ TU HISTÓRICO
     FECHA_INICIO = "2026-01-01"
     FECHA_FIN = "2026-04-05"
     DIAS_POR_BLOQUE = 7
@@ -32,6 +69,13 @@ def main():
     print(f"Rango total: {FECHA_INICIO} a {FECHA_FIN}")
     print(f"Tamaño de bloque: {DIAS_POR_BLOQUE} días")
     print(f"ACTUALIZAR_GOOGLE_SHEETS: {ACTUALIZAR_GOOGLE_SHEETS}")
+
+    print("Extrayendo catálogo de campañas una sola vez...")
+    registros_campaigns = obtener_campaigns()
+    df_campaigns = transformar_campaigns(registros_campaigns)
+
+    print(f"Campañas extraídas: {len(registros_campaigns)}")
+    print(f"Filas tabla campaigns: {len(df_campaigns)}")
 
     bloques = list(generar_bloques_fecha(FECHA_INICIO, FECHA_FIN, DIAS_POR_BLOQUE))
     print(f"Total de bloques a procesar: {len(bloques)}")
@@ -55,7 +99,7 @@ def main():
             cantidad_registros = len(registros)
             total_registros_crudos += cantidad_registros
 
-            print(f"Registros crudos extraídos: {cantidad_registros}")
+            print(f"Registros crudos insights extraídos: {cantidad_registros}")
 
             if not registros:
                 bloques_sin_datos += 1
@@ -67,6 +111,9 @@ def main():
             df_base = transformar_base(registros)
             df_resultados = transformar_resultados(registros)
 
+            df_base = enriquecer_con_campaigns(df_base, df_campaigns)
+            df_resultados = enriquecer_con_campaigns(df_resultados, df_campaigns)
+
             filas_base = len(df_base)
             filas_resultados = len(df_resultados)
 
@@ -76,12 +123,10 @@ def main():
             print(f"Filas tabla base: {filas_base}")
             print(f"Filas tabla resultados: {filas_resultados}")
 
-            # Detectar tipos de resultado
             if not df_resultados.empty and "tipo_resultado_tecnico" in df_resultados.columns:
                 tipos_bloque = df_resultados["tipo_resultado_tecnico"].dropna().unique().tolist()
                 tipos_detectados.update(tipos_bloque)
 
-            # 🔥 CLAVE: TRUNCATE SOLO EN EL PRIMER BLOQUE
             if i == 1:
                 write_mode = "truncate"
             else:
@@ -89,13 +134,11 @@ def main():
 
             print(f"Modo de carga BigQuery: {write_mode}")
 
-            # 🚀 CARGA A BIGQUERY
             cargar_tabla_base_bigquery(df_base, write_mode=write_mode)
             cargar_tabla_resultados_bigquery(df_resultados, write_mode=write_mode)
 
             print("BigQuery actualizado correctamente.")
 
-            # 📊 GOOGLE SHEETS
             if ACTUALIZAR_GOOGLE_SHEETS:
                 print("Actualizando Google Sheets...")
                 from sheets_writer import actualizar_google_sheets
@@ -112,7 +155,6 @@ def main():
             traceback.print_exc()
             print("Se continúa con el siguiente bloque...")
 
-    # 📊 RESUMEN
     print("\n" + "-" * 60)
     print("TIPOS DE RESULTADO DETECTADOS")
     print("-" * 60)
