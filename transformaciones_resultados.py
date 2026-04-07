@@ -37,6 +37,22 @@ def mapear_tipo_resultado(tipo):
     }
     return mapping.get(tipo, tipo)
 
+
+def clasificar_estado_campania(estado):
+    estado = str(estado).upper()
+
+    if estado == "ACTIVE":
+        return "Activa"
+    elif estado == "PAUSED":
+        return "Pausada"
+    elif estado == "ARCHIVED":
+        return "Archivada"
+    elif estado in {"DELETED", "DISAPPROVED", "WITH_ISSUES"}:
+        return "Inactiva"
+    else:
+        return "Inactiva"
+
+
 def construir_dict_costos(lista_costos):
     costos = {}
 
@@ -83,6 +99,16 @@ def transformar_resultados(registros):
         acciones = row.get("actions", [])
         costos_dict = construir_dict_costos(row.get("cost_per_action_type", []))
 
+        estado_efectivo = row.get("effective_status")
+        estado_configurado = row.get("status")
+
+        if pd.notna(estado_efectivo):
+            estado_campania = clasificar_estado_campania(estado_efectivo)
+        elif pd.notna(estado_configurado):
+            estado_campania = clasificar_estado_campania(estado_configurado)
+        else:
+            estado_campania = None
+
         id_base = construir_id_base(
             row.get("date_start"),
             row.get("campaign_id"),
@@ -106,6 +132,9 @@ def transformar_resultados(registros):
                     "fecha_fin": row.get("date_stop"),
                     "id_campania": row.get("campaign_id"),
                     "nombre_campania": row.get("campaign_name"),
+                    "status": estado_configurado,
+                    "effective_status": estado_efectivo,
+                    "estado_campania": estado_campania,
                     "id_anuncio": row.get("ad_id"),
                     "nombre_anuncio": row.get("ad_name"),
                     "nombre_conjunto_anuncios": row.get("adset_name"),
@@ -120,6 +149,30 @@ def transformar_resultados(registros):
                 })
 
     df_resultados = pd.DataFrame(filas)
+
+    if df_resultados.empty:
+        return pd.DataFrame(columns=[
+            "id_resultado",
+            "id_base",
+            "fecha_inicio",
+            "fecha_fin",
+            "id_campania",
+            "nombre_campania",
+            "status",
+            "effective_status",
+            "estado_campania",
+            "id_anuncio",
+            "nombre_anuncio",
+            "nombre_conjunto_anuncios",
+            "objetivo",
+            "edad",
+            "genero",
+            "tipo_resultado_tecnico",
+            "tipo_resultado",
+            "resultados",
+            "costo_por_resultado",
+            "load_timestamp",
+        ])
 
     # Limpieza de tipos
     columnas_float = [
@@ -138,6 +191,9 @@ def transformar_resultados(registros):
         "fecha_fin",
         "id_campania",
         "nombre_campania",
+        "status",
+        "effective_status",
+        "estado_campania",
         "id_anuncio",
         "nombre_anuncio",
         "nombre_conjunto_anuncios",
@@ -151,4 +207,5 @@ def transformar_resultados(registros):
         "load_timestamp",
     ]
 
-    return df_resultados[columnas_finales]
+    columnas_existentes = [c for c in columnas_finales if c in df_resultados.columns]
+    return df_resultados[columnas_existentes]
