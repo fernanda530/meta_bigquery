@@ -1,10 +1,10 @@
-name: Meta histórico a Google Sheets
+name: Meta histórico a BigQuery y Google Sheets
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-historico-sheets:
+  run-historico:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,16 +21,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ejecutar histórico a Sheets
+      - name: Crear archivo de credenciales GCP
+        run: |
+          echo '${{ secrets.GCP_CREDENTIALS_JSON }}' > gcp_credentials.json
+
+      - name: Ejecutar histórico a BigQuery y Sheets
         env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
           META_API_VERSION: v25.0
-          META_FIELDS: reach,campaign_id,campaign_name,ad_id,ad_name,actions,cost_per_action_type,cpc,date_start,date_stop,spend,adset_name,objective
+          META_FIELDS: reach,campaign_id,campaign_name,status,effective_status,ad_id,ad_name,actions,cost_per_action_type,cpc,date_start,date_stop,spend,adset_name,objective
           META_BREAKDOWNS: age,gender
           META_LEVEL: ad
+
           ACTUALIZAR_GOOGLE_SHEETS: "True"
           GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          BQ_DATASET: ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_credentials.json
+
         run: |
           python historico_meta.py
