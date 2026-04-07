@@ -19,7 +19,20 @@ def extraer_clicks_enlace(actions):
 
     return None
 
+def clasificar_estado_campania(estado):
+    estado = str(estado).upper()
 
+    if estado == "ACTIVE":
+        return "Activa"
+    elif estado == "PAUSED":
+        return "Pausada"
+    elif estado == "ARCHIVED":
+        return "Archivada"
+    elif estado in {"DELETED", "DISAPPROVED", "WITH_ISSUES"}:
+        return "Inactiva"
+    else:
+        return "Inactiva"
+    
 def construir_id_base(fecha_inicio, id_campania, id_anuncio, edad, genero):
     return (
         str(fecha_inicio) + "|" +
@@ -75,10 +88,19 @@ def transformar_base(registros):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
 
+        # Estado de campaña
+    if "effective_status" in df.columns:
+        df["estado_campania"] = df["effective_status"].apply(clasificar_estado_campania)
+    elif "status" in df.columns:
+        df["estado_campania"] = df["status"].apply(clasificar_estado_campania)
+    else:
+        df["estado_campania"] = None
+    
     # Timestamp de carga
     df["load_timestamp"] = datetime.now()
 
     # Renombramos
+
     df = df.rename(columns={
         "date_start": "fecha_inicio",
         "date_stop": "fecha_fin",
@@ -89,8 +111,11 @@ def transformar_base(registros):
         "adset_name": "nombre_conjunto_anuncios",
         "objective": "objetivo",
         "age": "edad",
-        "gender": "genero"
+        "gender": "genero",
+        "status": "status",
+        "effective_status": "effective_status"
     })
+    
 
     if "fecha_inicio" in df.columns:
         df["fecha_inicio"] = pd.to_datetime(df["fecha_inicio"], errors="coerce")
@@ -117,6 +142,8 @@ def transformar_base(registros):
         "alcance",
         "id_campania",
         "nombre_campania",
+        "status",
+        "effective_status",
         "id_anuncio",
         "nombre_anuncio",
         "clics_enlace",
