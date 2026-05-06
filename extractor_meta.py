@@ -11,6 +11,9 @@ from config import (
 )
 
 
+META_CAMPAIGN_FIELDS = "id,name,status,effective_status,created_time,start_time,updated_time,stop_time"
+
+
 def obtener_insights(fecha_inicio=None, fecha_fin=None):
     if not META_ACCESS_TOKEN:
         raise ValueError("Falta META_ACCESS_TOKEN en el .env")
@@ -47,6 +50,37 @@ def obtener_insights(fecha_inicio=None, fecha_fin=None):
         registros.extend(data.get("data", []))
 
         # Después de la primera llamada, ya no se mandan params otra vez
+        paging = data.get("paging", {})
+        url = paging.get("next")
+        params = None
+
+    return registros
+
+
+def obtener_campanias():
+    if not META_ACCESS_TOKEN:
+        raise ValueError("Falta META_ACCESS_TOKEN en el .env")
+
+    if not META_AD_ACCOUNT_ID:
+        raise ValueError("Falta META_AD_ACCOUNT_ID en el .env")
+
+    url = f"https://graph.facebook.com/{META_API_VERSION}/{META_AD_ACCOUNT_ID}/campaigns"
+
+    params = {
+        "access_token": META_ACCESS_TOKEN,
+        "fields": META_CAMPAIGN_FIELDS,
+        "limit": 500
+    }
+
+    registros = []
+
+    while url:
+        response = requests.get(url, params=params, timeout=60)
+        response.raise_for_status()
+
+        data = response.json()
+        registros.extend(data.get("data", []))
+
         paging = data.get("paging", {})
         url = paging.get("next")
         params = None
