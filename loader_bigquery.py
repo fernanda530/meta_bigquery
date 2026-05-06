@@ -2,11 +2,14 @@ from config import GCP_PROJECT_ID, BQ_DATASET
 from google.cloud import bigquery
 
 
+# Tablas destino
 BQ_TABLE_BASE = "meta_ads_base"
 BQ_TABLE_RESULTADOS = "meta_ads_resultados"
+BQ_TABLE_ESTATUS_CAMPANIA = "meta_ads_estatus_campania"
 
-
+#Consulta en BigQuery los IDs que ya existen.
 def obtener_ids_existentes(client, table_id, id_column, ids_a_revisar):
+
     if not ids_a_revisar:
         return set()
 
@@ -32,16 +35,17 @@ def obtener_ids_existentes(client, table_id, id_column, ids_a_revisar):
 
     return ids_existentes
 
+# Filtra el DataFrame y deja solo registros nuevos.
 
 def filtrar_nuevos_registros(df, client, table_id, id_column):
+
     if df.empty:
-        return df, 0, 0
+        return df
 
     if id_column not in df.columns:
         raise ValueError(f"No existe la columna '{id_column}' en el DataFrame.")
 
     ids_locales = set(df[id_column].dropna().astype(str).tolist())
-    total_locales = len(df)
 
     try:
         ids_existentes = obtener_ids_existentes(client, table_id, id_column, ids_locales)
@@ -55,48 +59,35 @@ def filtrar_nuevos_registros(df, client, table_id, id_column):
     df[id_column] = df[id_column].astype(str)
     df_nuevo = df[~df[id_column].isin(ids_existentes)].copy()
 
-    repetidos = total_locales - len(df_nuevo)
-
     print(f"Registros nuevos a insertar en {table_id}: {len(df_nuevo)}")
-    print(f"Registros repetidos/no insertados en {table_id}: {repetidos}")
+    return df_nuevo
 
-    return df_nuevo, len(df_nuevo), repetidos
+#Carga dataframe a bigquery
+#Con append insertamos solo registros nuevos, con truncate remplaza toda la tabla
+def _cargar_dataframe(df, table_name, id_column=None, write_mode="append", filtrar_existentes=True):
 
-
-def _cargar_dataframe(df, table_name, id_column, write_mode="append"):
     if df.empty:
         print(f"No hay datos para cargar en {table_name}.")
-        return {
-            "tabla": table_name,
-            "total_df": 0,
-            "insertados": 0,
-            "repetidos": 0,
-            "modo": write_mode
-        }
+        return
 
     client = bigquery.Client(project=GCP_PROJECT_ID)
     table_id = f"{GCP_PROJECT_ID}.{BQ_DATASET}.{table_name}"
-    total_df = len(df)
 
     if write_mode == "truncate":
         disposition = bigquery.WriteDisposition.WRITE_TRUNCATE
         df_cargar = df.copy()
-        insertados = len(df_cargar)
-        repetidos = 0
         print(f"Modo truncate para {table_id}: se reemplazará la tabla.")
     elif write_mode == "append":
         disposition = bigquery.WriteDisposition.WRITE_APPEND
-        df_cargar, insertados, repetidos = filtrar_nuevos_registros(df.copy(), client, table_id, id_column)
+        if filtrar_existentes:
+            df_cargar = filtrar_nuevos_registros(df.copy(), client, table_id, id_column)
+        else:
+            df_cargar = df.copy()
+            print(f"Modo append para {table_id}: se insertaran todos los registros del snapshot.")
 
         if df_cargar.empty:
             print(f"No hay registros nuevos para insertar en {table_id}.")
-            return {
-                "tabla": table_name,
-                "total_df": total_df,
-                "insertados": 0,
-                "repetidos": repetidos,
-                "modo": write_mode
-            }
+            return
     else:
         raise ValueError("write_mode debe ser 'append' o 'truncate'")
 
@@ -104,27 +95,24 @@ def _cargar_dataframe(df, table_name, id_column, write_mode="append"):
         write_disposition=disposition
     )
 
-    print(f"Columnas que se enviarán a {table_id}:")
-    print(df_cargar.columns.tolist())
-    print(df_cargar.head(3))
-
     job = client.load_table_from_dataframe(df_cargar, table_id, job_config=job_config)
     job.result()
 
     print(f"Datos cargados correctamente en {table_id}")
 
-    return {
-        "tabla": table_name,
-        "total_df": total_df,
-        "insertados": insertados,
-        "repetidos": repetidos,
-        "modo": write_mode
-    }
-
 
 def cargar_tabla_base_bigquery(df_base, write_mode="append"):
-    return _cargar_dataframe(df_base, BQ_TABLE_BASE, "id_base", write_mode=write_mode)
+    _cargar_dataframe(df_base, BQ_TABLE_BASE, "id_base", write_mode=write_mode)
 
 
 def cargar_tabla_resultados_bigquery(df_resultados, write_mode="append"):
-    return _cargar_dataframe(df_resultados, BQ_TABLE_RESULTADOS, "id_resultado", write_mode=write_mode)
+    _cargar_dataframe(df_resultados, BQ_TABLE_RESULTADOS, "id_resultado", write_mode=write_mode)
+
+
+def cargar_tabla_estatus_campania_bigquery(df_estatus_campania, write_mode="append"):
+    _cargar_dataframe(
+        df_estatus_campania,
+        BQ_TABLE_ESTATUS_CAMPANIA,
+        write_mode=write_mode,
+        filtrar_existentes=False,
+    )
