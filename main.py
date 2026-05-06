@@ -1,123 +1,88 @@
-from extractor_meta import obtener_insights
-from extractor_campaigns import obtener_campaigns
+from extractor_meta import obtener_campanias, obtener_insights
 from transformaciones_base import transformar_base
+from transformaciones_estatus_campania import transformar_estatus_campania
 from transformaciones_resultados import transformar_resultados
-from transformaciones_campaigns import transformar_campaigns
-from loader_bigquery import (
-    cargar_tabla_base_bigquery,
-    cargar_tabla_resultados_bigquery
-)
-from config import ACTUALIZAR_GOOGLE_SHEETS
-
-
-def enriquecer_con_campaigns(df_principal, df_campaigns):
-    if df_principal.empty:
-        return df_principal
-
-    if df_campaigns.empty:
-        print("No se encontraron campañas para enriquecer datos.")
-        return df_principal
-
-    if "id_campania" not in df_principal.columns:
-        print("El dataframe principal no tiene 'id_campania'.")
-        return df_principal
-
-    if "id_campania" not in df_campaigns.columns:
-        print("El dataframe de campañas no tiene 'id_campania'.")
-        return df_principal
-
-    df = df_principal.copy()
-    df_camp = df_campaigns.copy()
-
-    df["id_campania"] = df["id_campania"].astype(str)
-    df_camp["id_campania"] = df_camp["id_campania"].astype(str)
-
-    # Evita duplicados de columnas al hacer merge
-    df = df.drop(columns=["status", "effective_status", "estado_campania"], errors="ignore")
-
-    columnas_campaign = ["id_campania", "status", "effective_status", "estado_campania"]
-    columnas_campaign_existentes = [c for c in columnas_campaign if c in df_camp.columns]
-
-    df = df.merge(
-        df_camp[columnas_campaign_existentes],
-        on="id_campania",
-        how="left"
-    )
-
-    return df
+from config import MODO_PRUEBA, EXPORTAR_EXCEL_PREVIEW
 
 
 def main():
     print("Iniciando extracción de Meta...")
 
-    # 1) Insights
     registros = obtener_insights()
-    print(f"Registros crudos insights extraídos: {len(registros)}")
+    print(f"Registros extraídos desde Meta: {len(registros)}")
 
-    # 2) Campaigns
-    registros_campaigns = obtener_campaigns()
-    print(f"Registros de campañas extraídos: {len(registros_campaigns)}")
-
-    # 3) Transformaciones
+    # Tabla base
     df_base = transformar_base(registros)
-    df_resultados = transformar_resultados(registros)
-    df_campaigns = transformar_campaigns(registros_campaigns)
-
-    print(f"Filas base antes de enriquecer: {len(df_base)}")
-    print(f"Filas resultados antes de enriquecer: {len(df_resultados)}")
-    print(f"Filas campaigns: {len(df_campaigns)}")
-
-    # 4) Enriquecer con campaigns
-    df_base = enriquecer_con_campaigns(df_base, df_campaigns)
-    df_resultados = enriquecer_con_campaigns(df_resultados, df_campaigns)
-
-    print("Columnas finales base:")
+    print(f"\nFilas tabla base: {len(df_base)}")
+    print("Columnas tabla base:")
     print(df_base.columns.tolist())
 
-    print("Columnas finales resultados:")
-    print(df_resultados.columns.tolist())
-
     if not df_base.empty:
-        print("Vista previa base:")
-        print(df_base.head(3))
+        print("\nVista previa tabla base:")
+        print(df_base.head())
 
+    #Tabla resultados
+    df_resultados = transformar_resultados(registros)
+    print(f"\nFilas tabla resultados: {len(df_resultados)}")
+    print("Columnas tabla resultados:")
+    print(df_resultados.columns.tolist())
+ 
     if not df_resultados.empty:
-        print("Vista previa resultados:")
-        print(df_resultados.head(3))
+        print("\nVista previa tabla resultados:")
+        print(df_resultados.head())
 
-    # 5) Carga a BigQuery
-    print("Cargando tabla base a BigQuery...")
-    resumen_base = cargar_tabla_base_bigquery(df_base, write_mode="append")
+    # Exportar excels
+    if EXPORTAR_EXCEL_PREVIEW:
+        if not df_base.empty:
+            df_base.to_excel("preview_meta_base.xlsx", index=False)
+            print("\nSe generó preview_meta_base.xlsx")
 
-    print("Cargando tabla resultados a BigQuery...")
-    resumen_resultados = cargar_tabla_resultados_bigquery(df_resultados, write_mode="append")
+        if not df_resultados.empty:
+            df_resultados.to_excel("preview_meta_resultados.xlsx", index=False)
+            print("Se generó preview_meta_resultados.xlsx")
 
-    print("\n" + "#" * 60)
-    print("RESUMEN DE CARGA BIGQUERY")
-    print("#" * 60)
-    print(f"BASE -> total procesado: {resumen_base['total_df']}")
-    print(f"BASE -> insertados: {resumen_base['insertados']}")
-    print(f"BASE -> repetidos/no insertados: {resumen_base['repetidos']}")
-    print(f"BASE -> modo: {resumen_base['modo']}")
-    print("-" * 60)
-    print(f"RESULTADOS -> total procesado: {resumen_resultados['total_df']}")
-    print(f"RESULTADOS -> insertados: {resumen_resultados['insertados']}")
-    print(f"RESULTADOS -> repetidos/no insertados: {resumen_resultados['repetidos']}")
-    print(f"RESULTADOS -> modo: {resumen_resultados['modo']}")
-    print("#" * 60)
-
-    print("BigQuery actualizado correctamente.")
-
-    # 6) Google Sheets
-    if ACTUALIZAR_GOOGLE_SHEETS:
-        print("Actualizando Google Sheets...")
-        from sheets_writer import actualizar_google_sheets
-        actualizar_google_sheets(df_base, df_resultados)
-        print("Google Sheets actualizado correctamente.")
+    # Bigquery
+    if MODO_PRUEBA:
+        print("\nMODO_PRUEBA=True → No se subirán datos a BigQuery.")
     else:
-        print("ACTUALIZAR_GOOGLE_SHEETS=False → No se actualiza Google Sheets.")
+        print("\nMODO_PRUEBA=False -> Subiendo tablas a BigQuery...")
 
-    print("Proceso finalizado correctamente.")
+        from loader_bigquery import (
+            cargar_tabla_base_bigquery,
+            cargar_tabla_estatus_campania_bigquery,
+            cargar_tabla_resultados_bigquery,
+        )
+
+        if not df_base.empty:
+            cargar_tabla_base_bigquery(df_base)
+
+        if not df_resultados.empty:
+            cargar_tabla_resultados_bigquery(df_resultados)
+
+    # Tabla estatus campania
+    registros_campanias = obtener_campanias()
+    print(f"\nCampanias extraidas desde Meta: {len(registros_campanias)}")
+
+    df_estatus_campania = transformar_estatus_campania(registros_campanias)
+    print(f"\nFilas tabla estatus campania: {len(df_estatus_campania)}")
+    print("Columnas tabla estatus campania:")
+    print(df_estatus_campania.columns.tolist())
+
+    if not df_estatus_campania.empty:
+        print("\nVista previa tabla estatus campania:")
+        print(df_estatus_campania.head())
+
+        if EXPORTAR_EXCEL_PREVIEW:
+            df_estatus_campania.to_excel("preview_meta_estatus_campania.xlsx", index=False)
+            print("Se genero preview_meta_estatus_campania.xlsx")
+
+    if MODO_PRUEBA:
+        print("\nMODO_PRUEBA=True -> No se subira estatus campania a BigQuery.")
+    else:
+        if not df_estatus_campania.empty:
+            cargar_tabla_estatus_campania_bigquery(df_estatus_campania)
+
+    print("\nProceso finalizado.")
 
 
 if __name__ == "__main__":
