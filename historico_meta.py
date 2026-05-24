@@ -62,7 +62,7 @@ def enriquecer_con_campaigns(df_principal, df_campaigns):
 
 def main():
     FECHA_INICIO = "2026-01-01"
-    FECHA_FIN = "2026-04-05"
+    FECHA_FIN = (datetime.now() - timedelta(days=1)).date().isoformat()
     DIAS_POR_BLOQUE = 7
 
     print("===== INICIO HISTÓRICO META =====")
