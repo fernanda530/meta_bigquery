@@ -2,7 +2,7 @@ from extractor_meta import obtener_campanias, obtener_insights
 from transformaciones_base import transformar_base
 from transformaciones_estatus_campania import transformar_estatus_campania
 from transformaciones_resultados import transformar_resultados
-from config import MODO_PRUEBA, EXPORTAR_EXCEL_PREVIEW
+from config import ACTUALIZAR_GOOGLE_SHEETS, MODO_PRUEBA, EXPORTAR_EXCEL_PREVIEW
 
 
 def main():
@@ -58,6 +58,14 @@ def main():
 
         if not df_resultados.empty:
             cargar_tabla_resultados_bigquery(df_resultados)
+
+    if ACTUALIZAR_GOOGLE_SHEETS:
+        print("\nActualizando Google Sheets...")
+        from sheets_writer import actualizar_google_sheets
+        actualizar_google_sheets(df_base, df_resultados)
+        print("Google Sheets actualizado correctamente.")
+    else:
+        print("\nNo se actualiza Google Sheets.")
 
     # Tabla estatus campania
     registros_campanias = obtener_campanias()

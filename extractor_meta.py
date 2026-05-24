@@ -7,6 +7,7 @@ from config import (
     META_FIELDS,
     META_BREAKDOWNS,
     META_LEVEL,
+    META_TIME_INCREMENT,
     META_DATE_PRESET,
 )
 
@@ -26,10 +27,15 @@ def obtener_insights(fecha_inicio=None, fecha_fin=None):
     params = {
         "access_token": META_ACCESS_TOKEN,
         "fields": META_FIELDS,
-        "breakdowns": META_BREAKDOWNS,
         "level": META_LEVEL,
         "limit": 500
     }
+
+    if META_BREAKDOWNS:
+        params["breakdowns"] = META_BREAKDOWNS
+
+    if META_TIME_INCREMENT:
+        params["time_increment"] = META_TIME_INCREMENT
 
     if fecha_inicio and fecha_fin:
         params["time_range"] = json.dumps({

@@ -142,7 +142,7 @@ def main():
             if ACTUALIZAR_GOOGLE_SHEETS:
                 print("Actualizando Google Sheets...")
                 from sheets_writer import actualizar_google_sheets
-                actualizar_google_sheets(df_base, df_resultados)
+                actualizar_google_sheets(df_base, df_resultados, write_mode=write_mode)
                 print("Google Sheets actualizado correctamente.")
             else:
                 print("No se actualiza Google Sheets.")

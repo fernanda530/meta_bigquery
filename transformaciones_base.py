@@ -19,6 +19,17 @@ def extraer_clicks_enlace(actions):
 
     return None
 
+
+def primer_valor_numerico(row, columnas):
+    for col in columnas:
+        valor = row.get(col)
+        if pd.notna(valor):
+            numero = to_float(valor)
+            if numero is not None:
+                return numero
+    return None
+
+
 def clasificar_estado_campania(estado):
     estado = str(estado).upper()
 
@@ -57,14 +68,25 @@ def transformar_base(registros):
         df["date_stop"] = pd.to_datetime(df["date_stop"], errors="coerce").dt.normalize()
 
     # Métricas base
+    df["impresiones"] = df["impressions"].apply(to_float) if "impressions" in df.columns else None
     df["alcance"] = df["reach"].apply(to_float) if "reach" in df.columns else None
+    df["frecuencia"] = df["frequency"].apply(to_float) if "frequency" in df.columns else None
+    df["clics_totales"] = df["clicks"].apply(to_float) if "clicks" in df.columns else None
     df["importe_gastado_mxn"] = df["spend"].apply(to_float) if "spend" in df.columns else None
     df["cpc_general"] = df["cpc"].apply(to_float) if "cpc" in df.columns else None
+    df["cpm"] = df["cpm"].apply(to_float) if "cpm" in df.columns else None
+    df["ctr"] = df["ctr"].apply(to_float) if "ctr" in df.columns else None
 
     if "actions" in df.columns:
         df["clics_enlace"] = df["actions"].apply(extraer_clicks_enlace)
     else:
         df["clics_enlace"] = None
+
+    if "inline_link_clicks" in df.columns:
+        df["clics_enlace"] = df.apply(
+            lambda row: primer_valor_numerico(row, ["inline_link_clicks", "clics_enlace"]),
+            axis=1
+        )
 
     df["cpc_enlace"] = df.apply(
         lambda row: (
@@ -78,9 +100,15 @@ def transformar_base(registros):
 
     # Limpieza de tipos numéricos
     columnas_float = [
+        "impresiones",
         "alcance",
+        "frecuencia",
+        "clics_totales",
         "clics_enlace",
+        "cpc_general",
         "cpc_enlace",
+        "cpm",
+        "ctr",
         "importe_gastado_mxn"
     ]
 
@@ -106,6 +134,7 @@ def transformar_base(registros):
         "date_stop": "fecha_fin",
         "campaign_id": "id_campania",
         "campaign_name": "nombre_campania",
+        "adset_id": "id_conjunto_anuncios",
         "ad_id": "id_anuncio",
         "ad_name": "nombre_anuncio",
         "adset_name": "nombre_conjunto_anuncios",
@@ -115,6 +144,17 @@ def transformar_base(registros):
         "status": "status",
         "effective_status": "effective_status"
     })
+
+    columnas_opcionales = [
+        "id_conjunto_anuncios",
+        "nombre_conjunto_anuncios",
+        "edad",
+        "genero",
+    ]
+
+    for col in columnas_opcionales:
+        if col not in df.columns:
+            df[col] = None
     
 
     if "fecha_inicio" in df.columns:
@@ -139,15 +179,22 @@ def transformar_base(registros):
         "id_base",
         "fecha_inicio",
         "fecha_fin",
+        "impresiones",
         "alcance",
+        "frecuencia",
         "id_campania",
         "nombre_campania",
         "status",
         "effective_status",
+        "id_conjunto_anuncios",
         "id_anuncio",
         "nombre_anuncio",
+        "clics_totales",
         "clics_enlace",
+        "cpc_general",
         "cpc_enlace",
+        "cpm",
+        "ctr",
         "importe_gastado_mxn",
         "nombre_conjunto_anuncios",
         "objetivo",

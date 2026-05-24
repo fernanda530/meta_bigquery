@@ -9,11 +9,12 @@ META_AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
 META_API_VERSION = os.getenv("META_API_VERSION", "v25.0")
 META_FIELDS = os.getenv(
     "META_FIELDS",
-    "date_start,date_stop,campaign_id,campaign_name,status,effective_status,objective,ad_id,ad_name,spend,actions,cost_per_action_type"
+    "date_start,date_stop,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,status,effective_status,objective,impressions,reach,frequency,clicks,inline_link_clicks,cpc,cpm,ctr,spend,actions,cost_per_action_type"
 )
 
-META_BREAKDOWNS = os.getenv("META_BREAKDOWNS", "age,gender")
+META_BREAKDOWNS = os.getenv("META_BREAKDOWNS", "")
 META_LEVEL = os.getenv("META_LEVEL", "ad")
+META_TIME_INCREMENT = os.getenv("META_TIME_INCREMENT", "1")
 META_DATE_PRESET = os.getenv("META_DATE_PRESET", "yesterday")
 META_RESULT_ACTION_TYPE = os.getenv("META_RESULT_ACTION_TYPE")
 
