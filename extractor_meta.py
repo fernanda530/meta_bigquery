@@ -49,7 +49,12 @@ def obtener_insights(fecha_inicio=None, fecha_fin=None):
 
     while url:
         response = requests.get(url, params=params, timeout=60)
-        response.raise_for_status()
+
+        if not response.ok:
+            print("Error al consultar Meta Insights.")
+            print(f"Status code: {response.status_code}")
+            print(f"Respuesta Meta: {response.text}")
+            response.raise_for_status()
 
         data = response.json()
 

@@ -91,12 +91,12 @@ def _cargar_dataframe(df, table_name, id_column=None, write_mode="append", filtr
     else:
         raise ValueError("write_mode debe ser 'append' o 'truncate'")
 
-    job_config = bigquery.LoadJobConfig(
-        write_disposition=disposition,
-        schema_update_options=[
+    job_config = bigquery.LoadJobConfig(write_disposition=disposition)
+
+    if write_mode == "append":
+        job_config.schema_update_options = [
             bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION,
-        ],
-    )
+        ]
 
     job = client.load_table_from_dataframe(df_cargar, table_id, job_config=job_config)
     job.result()
